@@ -1,77 +1,127 @@
-import AmountInput from './AmountInput';
-import CurrencySelect from './CurrencySelect';
-import SwapButton from './SwapButton';
-import ConversionResult from './ConversionResult';
-import { ExchangeRates } from '@/types';
+"use client";
 
-interface ConverterFormProps {
-  amount: string;
-  fromCurrency: string;
-  toCurrency: string;
-  result: number | null;
-  validationError: string | null;
-  exchangeRates: ExchangeRates | null;
-  onAmountChange: (value: string) => void;
-  onFromCurrencyChange: (value: string) => void;
-  onToCurrencyChange: (value: string) => void;
-  onSwap: () => void;
-}
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useConverter, useExchangeRates } from "@/hooks";
+import type { ConversionRecord } from "@/types";
+import { addToHistory, clearHistory, loadHistory } from "@/utils/storage";
+import { AmountInput } from "./AmountInput";
+import { ConversionHistory } from "./ConversionHistory";
+import { ConversionResult } from "./ConversionResult";
+import { CurrencySelect } from "./CurrencySelect";
+import { ErrorMessage } from "./ErrorMessage";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { SwapButton } from "./SwapButton";
 
-export default function ConverterForm({
-  amount,
-  fromCurrency,
-  toCurrency,
-  result,
-  validationError,
-  exchangeRates,
-  onAmountChange,
-  onFromCurrencyChange,
-  onToCurrencyChange,
-  onSwap,
-}: ConverterFormProps) {
-  const currentRate = exchangeRates && fromCurrency && toCurrency
-    ? exchangeRates.rates[toCurrency] / exchangeRates.rates[fromCurrency]
-    : null;
+export function ConverterForm() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [history, setHistory] = useState<ConversionRecord[]>([]);
+
+  const {
+    amount,
+    setAmount,
+    fromCurrency,
+    setFromCurrency,
+    toCurrency,
+    setToCurrency,
+    swapCurrencies,
+    getConversion,
+    amountError,
+  } = useConverter({
+    amount: searchParams.get("amount") ?? undefined,
+    fromCurrency: searchParams.get("from") ?? undefined,
+    toCurrency: searchParams.get("to") ?? undefined,
+  });
+
+  const ratesState = useExchangeRates(fromCurrency);
+
+  const conversion = useMemo(() => getConversion(ratesState.data), [getConversion, ratesState.data]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHistory(loadHistory());
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams({
+      amount,
+      from: fromCurrency,
+      to: toCurrency,
+    });
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [amount, fromCurrency, toCurrency, router]);
+
+  useEffect(() => {
+    if (!conversion.data || ratesState.isLoading || ratesState.error) {
+      return;
+    }
+
+    const record: ConversionRecord = {
+      id: `${Date.now()}-${fromCurrency}-${toCurrency}`,
+      amount: conversion.data.amount,
+      fromCurrency,
+      toCurrency,
+      rate: conversion.data.rate,
+      result: conversion.data.convertedAmount,
+      createdAt: new Date().toISOString(),
+    };
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHistory(addToHistory(record));
+  }, [conversion.data, ratesState.isLoading, ratesState.error, fromCurrency, toCurrency]);
+
+  function handleReload(record: ConversionRecord) {
+    setAmount(String(record.amount));
+    setFromCurrency(record.fromCurrency);
+    setToCurrency(record.toCurrency);
+  }
+
+  function handleClearHistory() {
+    clearHistory();
+    setHistory([]);
+  }
+
+  const combinedError = amountError ?? ratesState.error ?? conversion.error;
 
   return (
     <div className="space-y-4">
-      {/* Single Row: Amount and Currency Selectors */}
-      <div className="space-y-2">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <AmountInput
-            value={amount}
-            onChange={onAmountChange}
-            error={validationError}
-          />
-
-          <CurrencySelect
-            value={fromCurrency}
-            onChange={onFromCurrencyChange}
-          />
-
-          <SwapButton onClick={onSwap} />
-
-          <CurrencySelect
-            value={toCurrency}
-            onChange={onToCurrencyChange}
-          />
-        </div>
-        
-        {/* Error message below the row */}
-        {validationError && (
-          <p className="text-sm text-red-600 px-1">{validationError}</p>
-        )}
+      <div className="flex flex-wrap items-start gap-3">
+        <AmountInput value={amount} onChange={setAmount} error={amountError} />
+        <CurrencySelect label="From" value={fromCurrency} onChange={setFromCurrency} />
+        <SwapButton onSwap={swapCurrencies} />
+        <CurrencySelect label="To" value={toCurrency} onChange={setToCurrency} />
+        <button
+          type="button"
+          className="mt-6 inline-flex h-10 min-w-36 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white"
+          disabled
+        >
+          {ratesState.isLoading ? (
+            <>
+              <LoadingSpinner />
+              Converting...
+            </>
+          ) : (
+            "Auto Convert"
+          )}
+        </button>
       </div>
 
-      {/* Result Display */}
-      {!validationError && (
+      {combinedError ? <ErrorMessage message={combinedError} /> : null}
+
+      {conversion.data && ratesState.data ? (
         <ConversionResult
-          result={result}
+          amount={conversion.data.amount}
+          convertedAmount={conversion.data.convertedAmount}
+          rate={conversion.data.rate}
           fromCurrency={fromCurrency}
           toCurrency={toCurrency}
-          rate={currentRate}
+          source={ratesState.data.source}
+          timestamp={ratesState.data.timestamp}
         />
-      )}
+      ) : null}
+
+      <ConversionHistory history={history} onReload={handleReload} onClear={handleClearHistory} />
     </div>
   );
 }

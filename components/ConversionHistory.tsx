@@ -1,72 +1,45 @@
-import { ConversionResult } from '@/types';
-import { formatAmount } from '@/utils/currency';
+import type { ConversionRecord } from "@/types";
+import { formatCurrency } from "@/utils/currency";
 
 interface ConversionHistoryProps {
-  history: ConversionResult[];
-  showHistory: boolean;
-  onToggle: () => void;
+  history: ConversionRecord[];
+  onReload: (record: ConversionRecord) => void;
   onClear: () => void;
-  onLoadConversion: (conversion: ConversionResult) => void;
 }
 
-export default function ConversionHistory({
-  history,
-  showHistory,
-  onToggle,
-  onClear,
-  onLoadConversion,
-}: ConversionHistoryProps) {
+export function ConversionHistory({ history, onReload, onClear }: ConversionHistoryProps) {
   return (
-    <div className="bg-white rounded-lg shadow-xl p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-900">Conversion History</h2>
-        <div className="flex gap-2">
-          {history.length > 0 && (
-            <button
-              onClick={onClear}
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 text-sm"
-            >
-              Clear History
-            </button>
-          )}
-          <button
-            onClick={onToggle}
-            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200 text-sm"
-          >
-            {showHistory ? 'Hide' : 'Show'} ({history.length})
-          </button>
-        </div>
+    <section className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Recent Conversions</h2>
+        <button
+          type="button"
+          onClick={onClear}
+          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-muted transition hover:border-danger hover:text-danger"
+        >
+          Clear
+        </button>
       </div>
-
-      {showHistory && (
-        <div className="space-y-2">
-          {history.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No conversion history yet</p>
-          ) : (
-            history.map((conversion, index) => (
-              <div
-                key={index}
-                onClick={() => onLoadConversion(conversion)}
-                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+      {history.length === 0 ? (
+        <p className="text-sm text-muted">No history yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {history.map((item) => (
+            <li key={item.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+              <span>
+                {formatCurrency(item.amount, item.fromCurrency)} → {formatCurrency(item.result, item.toCurrency)}
+              </span>
+              <button
+                type="button"
+                onClick={() => onReload(item)}
+                className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold transition hover:border-primary hover:text-primary"
               >
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900">
-                      {formatAmount(conversion.amount)} {conversion.from} → {formatAmount(conversion.result)} {conversion.to}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Rate: 1 {conversion.from} = {formatAmount(conversion.rate, 4)} {conversion.to}
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {new Date(conversion.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                Reload
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
-    </div>
+    </section>
   );
 }

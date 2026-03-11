@@ -1,132 +1,205 @@
-import { NextRequest, NextResponse } from 'next/server';
+import https from "node:https";
+import { NextResponse } from "next/server";
+import { SUPPORTED_CURRENCIES, type CurrencyCode } from "@/types";
 
-// API sources with fallback support
-// Using free APIs that don't require authentication
-const API_SOURCES = [
+export const revalidate = 3600;
+
+const ONE_HOUR_IN_SECONDS = 3600;
+const REQUEST_TIMEOUT_MS = 7000;
+
+interface NormalizedRates {
+  source: string;
+  rates: Record<CurrencyCode, number>;
+}
+
+interface SourceDefinition {
+  name: string;
+  url: (base: CurrencyCode) => string;
+  parse: (payload: unknown) => Record<string, number> | null;
+}
+
+const SOURCES: SourceDefinition[] = [
   {
-    name: 'frankfurter.app',
-    url: 'https://api.frankfurter.app/latest?from=USD',
-    transform: (data: any) => ({
-      base: data.base,
-      rates: { USD: 1, ...data.rates }, // Add USD since it's not included
-    }),
+    name: "exchangerate.host",
+    url: (base) => `https://api.exchangerate.host/latest?base=${base}&symbols=${SUPPORTED_CURRENCIES.join(",")}`,
+    parse: (payload) => {
+      if (!payload || typeof payload !== "object" || !("rates" in payload)) {
+        return null;
+      }
+      const rates = (payload as { rates?: Record<string, number> }).rates;
+      return rates ?? null;
+    },
+  },
+  {
+    name: "exchangerate-api.com",
+    url: (base) => `https://api.exchangerate-api.com/v4/latest/${base}`,
+    parse: (payload) => {
+      if (!payload || typeof payload !== "object" || !("rates" in payload)) {
+        return null;
+      }
+      return (payload as { rates?: Record<string, number> }).rates ?? null;
+    },
+  },
+  {
+    name: "open.er-api.com",
+    url: (base) => `https://open.er-api.com/v6/latest/${base}`,
+    parse: (payload) => {
+      if (!payload || typeof payload !== "object" || !("rates" in payload)) {
+        return null;
+      }
+      return (payload as { rates?: Record<string, number> }).rates ?? null;
+    },
   },
 ];
 
-/**
- * Fetch exchange rates from a specific API source
- */
-async function fetchFromSource(source: typeof API_SOURCES[0]): Promise<any> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+function isSslError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
 
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("ssl") ||
+    message.includes("tls") ||
+    message.includes("certificate") ||
+    message.includes("unable to verify") ||
+    message.includes("self signed")
+  );
+}
+
+async function fetchWithSslFallback(url: string): Promise<unknown> {
   try {
-    // Use undici for better Node.js fetch support with SSL handling
-    const response = await fetch(source.url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      // @ts-ignore - Node.js specific options
-      ...(typeof process !== 'undefined' && {
-        agent: false, // Use default agent
-      }),
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      next: { revalidate: ONE_HOUR_IN_SECONDS },
     });
 
-    clearTimeout(timeout);
-
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`Request failed with status ${response.status}`);
     }
 
-    const data = await response.json();
-    return source.transform(data);
-  } catch (error: any) {
-    clearTimeout(timeout);
-    console.error(`Error fetching from ${source.name}:`, error.message);
-    throw error;
+    return response.json();
+  } catch (error) {
+    if (!isSslError(error)) {
+      throw error;
+    }
+
+    return insecureHttpsFetch(url);
   }
 }
 
-/**
- * Mock data for development/fallback when APIs are unavailable
- */
-const MOCK_RATES = {
-  base: 'USD',
-  rates: {
-    USD: 1.0,
-    EUR: 0.85,
-    GBP: 0.73,
-    JPY: 149.50,
-    AUD: 1.52,
-    CAD: 1.35,
-    CHF: 0.88,
-    CNY: 7.24,
-    INR: 83.12,
-    MXN: 17.25,
-  },
-};
+function insecureHttpsFetch(url: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      url,
+      {
+        method: "GET",
+        agent: new https.Agent({ rejectUnauthorized: false }),
+        timeout: REQUEST_TIMEOUT_MS,
+      },
+      (response) => {
+        let data = "";
+        response.setEncoding("utf8");
 
-/**
- * Fetch exchange rates with fallback support
- */
-async function fetchExchangeRates(): Promise<any> {
-  let lastError: Error | null = null;
+        response.on("data", (chunk) => {
+          data += chunk;
+        });
 
-  // Try each API source in order
-  for (const source of API_SOURCES) {
+        response.on("end", () => {
+          if (!response.statusCode || response.statusCode >= 400) {
+            reject(new Error(`SSL fallback failed with status ${response.statusCode ?? "unknown"}`));
+            return;
+          }
+
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            reject(new Error("SSL fallback returned invalid JSON"));
+          }
+        });
+      },
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error("SSL fallback request timed out"));
+    });
+
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+function normalizeRates(base: CurrencyCode, sourceName: string, rates: Record<string, number>): NormalizedRates | null {
+  const normalized = {} as Record<CurrencyCode, number>;
+
+  for (const currency of SUPPORTED_CURRENCIES) {
+    if (currency === base) {
+      normalized[currency] = 1;
+      continue;
+    }
+
+    const rawRate = rates[currency];
+    if (!rawRate || !Number.isFinite(rawRate)) {
+      return null;
+    }
+
+    normalized[currency] = rawRate;
+  }
+
+  return { source: sourceName, rates: normalized };
+}
+
+async function fetchRates(base: CurrencyCode): Promise<NormalizedRates> {
+  for (const source of SOURCES) {
     try {
-      const data = await fetchFromSource(source);
-      return data;
-    } catch (error: any) {
-      lastError = error;
-      console.error(`Failed to fetch from ${source.name}:`, error.message);
+      const payload = await fetchWithSslFallback(source.url(base));
+      const rawRates = source.parse(payload);
+      if (!rawRates) {
+        continue;
+      }
+
+      const normalized = normalizeRates(base, source.name, rawRates);
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // Continue with the next provider.
     }
   }
 
-  // If all sources failed, use mock data as fallback (useful in development)
-  console.warn('All API sources failed. Using mock data as fallback.');
-  console.error(`Last error: ${lastError?.message || 'Unknown error'}`);
-  return MOCK_RATES;
+  throw new Error("All rate providers are unavailable");
 }
 
-/**
- * API Route Handler for exchange rates
- * Implements 1-hour caching with Next.js revalidate
- */
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const base = (searchParams.get("base") ?? "USD").toUpperCase();
+
+  if (!SUPPORTED_CURRENCIES.includes(base as CurrencyCode)) {
+    return NextResponse.json({ error: "Invalid base currency" }, { status: 400 });
+  }
+
   try {
-    const data = await fetchExchangeRates();
+    const payload = await fetchRates(base as CurrencyCode);
 
     return NextResponse.json(
       {
-        success: true,
-        data: {
-          base: data.base,
-          rates: data.rates,
-          timestamp: Date.now(),
-        },
+        base,
+        rates: payload.rates,
+        source: payload.source,
+        timestamp: new Date().toISOString(),
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
         },
-      }
+      },
     );
-  } catch (error: any) {
-    console.error('Error in exchange rates API:', error);
-
+  } catch (error) {
     return NextResponse.json(
       {
-        success: false,
-        error: error.message || 'Failed to fetch exchange rates',
+        error: error instanceof Error ? error.message : "Failed to fetch rates",
       },
-      {
-        status: 500,
-      }
+      { status: 503 },
     );
   }
 }
-
-// Enable caching for 1 hour
-export const revalidate = 3600;
