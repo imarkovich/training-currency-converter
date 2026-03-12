@@ -15,11 +15,14 @@ interface ConverterInit {
 
 export function useConverter(init?: ConverterInit) {
   const [amount, setAmount] = useState(init?.amount ?? "1");
+  const initialFromCurrency = init?.fromCurrency ?? "";
+  const initialToCurrency = init?.toCurrency ?? "";
+
   const [fromCurrency, setFromCurrency] = useState<CurrencyCode>(
-    isCurrencyCode(init?.fromCurrency ?? "") ? init!.fromCurrency! : DEFAULT_FROM,
+    isCurrencyCode(initialFromCurrency) ? initialFromCurrency : DEFAULT_FROM,
   );
   const [toCurrency, setToCurrency] = useState<CurrencyCode>(
-    isCurrencyCode(init?.toCurrency ?? "") ? init!.toCurrency! : DEFAULT_TO,
+    isCurrencyCode(initialToCurrency) ? initialToCurrency : DEFAULT_TO,
   );
 
   function swapCurrencies() {
