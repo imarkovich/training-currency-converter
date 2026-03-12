@@ -108,6 +108,38 @@ describe('useConverter', () => {
     expect(result.current.toCurrency).toBe('USD');
   });
 
+  it('should auto-swap when selecting from currency equal to current to currency', () => {
+    const { result } = renderHook(() => useConverter(mockExchangeRates));
+
+    act(() => {
+      result.current.setFromCurrency('USD');
+      result.current.setToCurrency('EUR');
+    });
+
+    act(() => {
+      result.current.setFromCurrency('EUR');
+    });
+
+    expect(result.current.fromCurrency).toBe('EUR');
+    expect(result.current.toCurrency).toBe('USD');
+  });
+
+  it('should auto-swap when selecting to currency equal to current from currency', () => {
+    const { result } = renderHook(() => useConverter(mockExchangeRates));
+
+    act(() => {
+      result.current.setFromCurrency('USD');
+      result.current.setToCurrency('EUR');
+    });
+
+    act(() => {
+      result.current.setToCurrency('USD');
+    });
+
+    expect(result.current.fromCurrency).toBe('EUR');
+    expect(result.current.toCurrency).toBe('USD');
+  });
+
   it('should save conversion to history', async () => {
     const { result } = renderHook(() => useConverter(mockExchangeRates));
 
