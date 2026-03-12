@@ -1,0 +1,6 @@
+2026-03-12: Started task - create reusable bug-fixing prompt with best practices and extensive plan.
+2026-03-12: Completed task - added reusable bug-fixing prompt template with workflow, validation, and output format.
+2026-03-12: Updated .github/agents/ibeast.agent.md to a custom iBeast Mode profile with repo-focused workflow and verification rules.
+2026-03-12: Customized .github/instructions/nextjs.instructions.md with repository-specific architecture, testing, and validation guardrails.
+2026-03-12: Added reusable branch-sync prompt in .github/prompts/introduction.prompt.md (prefer origin/develop, fallback origin/main, safe rebase flow).
+2026-03-12: Added commit-and-push execution prompt in .github/prompts/finish.prompt.md with logical multi-commit strategy and safe push workflow.
