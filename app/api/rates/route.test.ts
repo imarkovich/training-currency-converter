@@ -43,4 +43,22 @@ describe("GET /api/rates", () => {
     expect(body.base).toBe("USD");
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
+
+  it("returns local fallback rates when all providers fail", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network error"));
+
+    const response = await GET(new Request("http://localhost/api/rates?base=USD"));
+    const body = (await response.json()) as {
+      base: string;
+      source: string;
+      rates: Record<string, number>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.base).toBe("USD");
+    expect(body.source).toBe("local-fallback");
+    expect(body.rates.USD).toBe(1);
+    expect(body.rates.EUR).toBeGreaterThan(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
 });

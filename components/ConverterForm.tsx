@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useConverter, useExchangeRates } from "@/hooks";
 import type { ConversionRecord } from "@/types";
@@ -17,6 +17,7 @@ export function ConverterForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [history, setHistory] = useState<ConversionRecord[]>([]);
+  const lastSavedSignature = useRef<string | null>(null);
 
   const {
     amount,
@@ -56,6 +57,29 @@ export function ConverterForm() {
     if (!conversion.data || ratesState.isLoading || ratesState.error) {
       return;
     }
+
+    // Skip transitional states while currency selectors are being updated.
+    if (fromCurrency === toCurrency) {
+      return;
+    }
+
+    if (!ratesState.data || ratesState.data.base !== fromCurrency) {
+      return;
+    }
+
+    const signature = [
+      conversion.data.amount,
+      fromCurrency,
+      toCurrency,
+      conversion.data.rate,
+      conversion.data.convertedAmount,
+    ].join("|");
+
+    if (lastSavedSignature.current === signature) {
+      return;
+    }
+
+    lastSavedSignature.current = signature;
 
     const record: ConversionRecord = {
       id: `${Date.now()}-${fromCurrency}-${toCurrency}`,

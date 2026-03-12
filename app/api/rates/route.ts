@@ -18,6 +18,21 @@ interface SourceDefinition {
   parse: (payload: unknown) => Record<string, number> | null;
 }
 
+// Local reference rates used when external providers are unreachable.
+// Values represent how much of each currency equals 1 USD.
+const USD_REFERENCE_RATES: Record<CurrencyCode, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.78,
+  JPY: 149.5,
+  CAD: 1.35,
+  AUD: 1.52,
+  CHF: 0.88,
+  CNY: 7.19,
+  INR: 82.9,
+  UAH: 39.4,
+};
+
 const SOURCES: SourceDefinition[] = [
   {
     name: "exchangerate.host",
@@ -149,6 +164,25 @@ function normalizeRates(base: CurrencyCode, sourceName: string, rates: Record<st
   return { source: sourceName, rates: normalized };
 }
 
+function buildLocalFallbackRates(base: CurrencyCode): NormalizedRates {
+  const baseToUsd = USD_REFERENCE_RATES[base];
+  const normalized = {} as Record<CurrencyCode, number>;
+
+  for (const currency of SUPPORTED_CURRENCIES) {
+    if (currency === base) {
+      normalized[currency] = 1;
+      continue;
+    }
+
+    normalized[currency] = USD_REFERENCE_RATES[currency] / baseToUsd;
+  }
+
+  return {
+    source: "local-fallback",
+    rates: normalized,
+  };
+}
+
 async function fetchRates(base: CurrencyCode): Promise<NormalizedRates> {
   for (const source of SOURCES) {
     try {
@@ -167,7 +201,7 @@ async function fetchRates(base: CurrencyCode): Promise<NormalizedRates> {
     }
   }
 
-  throw new Error("All rate providers are unavailable");
+  return buildLocalFallbackRates(base);
 }
 
 export async function GET(request: Request) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { convertAmount, isCurrencyCode, parseAmount, validateAmount } from "@/utils/currency";
 import type { ConversionSummary, CurrencyCode, ExchangeRatesPayload } from "@/types";
 
@@ -27,31 +27,34 @@ export function useConverter(init?: ConverterInit) {
     setToCurrency(fromCurrency);
   }
 
-  function getConversion(payload: ExchangeRatesPayload | null): { error: string | null; data: ConversionSummary | null } {
-    const validationError = validateAmount(amount);
-    if (validationError) {
-      return { error: validationError, data: null };
-    }
+  const getConversion = useCallback(
+    (payload: ExchangeRatesPayload | null): { error: string | null; data: ConversionSummary | null } => {
+      const validationError = validateAmount(amount);
+      if (validationError) {
+        return { error: validationError, data: null };
+      }
 
-    if (!payload) {
-      return { error: "Exchange rates are not loaded yet", data: null };
-    }
+      if (!payload) {
+        return { error: "Exchange rates are not loaded yet", data: null };
+      }
 
-    const rate = payload.rates[toCurrency];
-    if (!rate) {
-      return { error: `Rate for ${toCurrency} is unavailable`, data: null };
-    }
+      const rate = payload.rates[toCurrency];
+      if (!rate) {
+        return { error: `Rate for ${toCurrency} is unavailable`, data: null };
+      }
 
-    const parsed = parseAmount(amount);
-    return {
-      error: null,
-      data: {
-        amount: parsed,
-        rate,
-        convertedAmount: convertAmount(parsed, rate),
-      },
-    };
-  }
+      const parsed = parseAmount(amount);
+      return {
+        error: null,
+        data: {
+          amount: parsed,
+          rate,
+          convertedAmount: convertAmount(parsed, rate),
+        },
+      };
+    },
+    [amount, toCurrency],
+  );
 
   const amountError = useMemo(() => validateAmount(amount), [amount]);
 

@@ -39,4 +39,13 @@ describe("useConverter", () => {
     expect(result.current.fromCurrency).toBe("EUR");
     expect(result.current.toCurrency).toBe("USD");
   });
+
+  it("keeps getConversion stable between rerenders when inputs are unchanged", () => {
+    const { result, rerender } = renderHook(() => useConverter({ amount: "2", fromCurrency: "USD", toCurrency: "EUR" }));
+
+    const initialRef = result.current.getConversion;
+    rerender();
+
+    expect(result.current.getConversion).toBe(initialRef);
+  });
 });
