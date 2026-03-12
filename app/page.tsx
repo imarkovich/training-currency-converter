@@ -1,81 +1,16 @@
-'use client';
-
-import { useState } from 'react';
-import PageHeader from '@/components/PageHeader';
-import PageFooter from '@/components/PageFooter';
-import ErrorMessage from '@/components/ErrorMessage';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import ConverterForm from '@/components/ConverterForm';
-import ConversionHistory from '@/components/ConversionHistory';
-import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { useConverter } from '@/hooks/useConverter';
+import { ConverterForm, PageFooter, PageHeader } from "@/components";
 
 export default function Home() {
-  const [showHistory, setShowHistory] = useState<boolean>(false);
-  
-  // Fetch exchange rates
-  const { exchangeRates, loading, error } = useExchangeRates();
-
-  // Conversion logic
-  const {
-    amount,
-    fromCurrency,
-    toCurrency,
-    result,
-    validationError,
-    history,
-    setAmount,
-    setFromCurrency,
-    setToCurrency,
-    handleSwap,
-    loadFromHistory,
-    clearConversionHistory,
-  } = useConverter(exchangeRates);
-
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <PageHeader
-          title="Currency Converter"
-          subtitle="Convert currencies with real-time exchange rates"
-        />
-
-        {/* Main Converter Card */}
-        <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
-          <ErrorMessage message={error} />
-
-          {loading ? (
-            <LoadingSpinner message="Loading exchange rates..." />
-          ) : (
-            <ConverterForm
-              amount={amount}
-              fromCurrency={fromCurrency}
-              toCurrency={toCurrency}
-              result={result}
-              validationError={validationError}
-              exchangeRates={exchangeRates}
-              onAmountChange={setAmount}
-              onFromCurrencyChange={setFromCurrency}
-              onToCurrencyChange={setToCurrency}
-              onSwap={handleSwap}
-            />
-          )}
-        </div>
-
-        {/* History Section */}
-        <ConversionHistory
-          history={history}
-          showHistory={showHistory}
-          onToggle={() => setShowHistory(!showHistory)}
-          onClear={clearConversionHistory}
-          onLoadConversion={(conversion) => {
-            loadFromHistory(conversion);
-            setShowHistory(false);
-          }}
-        />
-
-        <PageFooter lastUpdated={exchangeRates?.timestamp} />
-      </div>
-    </main>
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(240,117,37,0.2),transparent_45%),radial-gradient(circle_at_90%_20%,rgba(51,89,255,0.2),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(21,153,87,0.14),transparent_45%)]" />
+      <main className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8">
+        <PageHeader />
+        <section className="mb-6 rounded-3xl border border-white/40 bg-white/65 p-4 shadow-2xl shadow-slate-800/10 backdrop-blur-sm sm:p-6">
+          <ConverterForm />
+        </section>
+        <PageFooter />
+      </main>
+    </div>
   );
 }

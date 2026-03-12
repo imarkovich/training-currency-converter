@@ -1,34 +1,37 @@
-// Type definitions for the currency converter application
+export const SUPPORTED_CURRENCIES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "JPY",
+  "CAD",
+  "AUD",
+  "CHF",
+  "CNY",
+  "INR",
+  "UAH",
+] as const;
 
-export interface Currency {
-  code: string;
-  name: string;
-  symbol: string;
+export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number];
+
+export interface ExchangeRatesPayload {
+  base: CurrencyCode;
+  rates: Record<CurrencyCode, number>;
+  source: string;
+  timestamp: string;
 }
 
-export interface ExchangeRates {
-  base: string;
-  rates: {
-    [key: string]: number;
-  };
-  timestamp?: number;
-}
-
-export interface ConversionResult {
-  from: string;
-  to: string;
+export interface ConversionRecord {
+  id: string;
   amount: number;
-  result: number;
+  fromCurrency: CurrencyCode;
+  toCurrency: CurrencyCode;
   rate: number;
-  timestamp: number;
+  result: number;
+  createdAt: string;
 }
 
-export interface ConversionHistory {
-  conversions: ConversionResult[];
-}
-
-export interface ApiResponse {
-  success: boolean;
-  data?: ExchangeRates;
-  error?: string;
+export interface ConversionSummary {
+  amount: number;
+  convertedAmount: number;
+  rate: number;
 }

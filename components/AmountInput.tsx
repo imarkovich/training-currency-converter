@@ -1,29 +1,28 @@
+import type { ChangeEvent } from "react";
+
 interface AmountInputProps {
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
-  label?: string;
 }
 
-export default function AmountInput({ value, onChange, error, label }: AmountInputProps) {
+export function AmountInput({ value, onChange, error }: AmountInputProps) {
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(event.target.value);
+  };
+
   return (
-    <div className="flex-1 w-full sm:w-auto">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {label}
-        </label>
-      )}
+    <label className="flex min-w-44 flex-1 flex-col gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted">Amount</span>
       <input
-        type="number"
+        aria-label="Amount"
+        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleChange}
+        inputMode="decimal"
         placeholder="Enter amount"
-        step="1"
-        min="0"
-        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none text-lg transition-colors ${
-          error ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-        }`}
       />
-    </div>
+      {error ? <span className="text-xs text-danger">{error}</span> : <span className="text-xs text-transparent">.</span>}
+    </label>
   );
 }

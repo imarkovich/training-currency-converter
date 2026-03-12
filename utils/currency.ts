@@ -1,87 +1,62 @@
-import { Currency } from '@/types';
+import type { CurrencyCode } from "@/types";
+import { SUPPORTED_CURRENCIES } from "@/types";
 
-// List of supported currencies with their details
-export const CURRENCIES: Currency[] = [
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
-  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
-  { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
-  { code: 'MXN', name: 'Mexican Peso', symbol: '$' },
+export const CURRENCY_OPTIONS: Array<{ code: CurrencyCode; label: string }> = [
+  { code: "USD", label: "US Dollar" },
+  { code: "EUR", label: "Euro" },
+  { code: "GBP", label: "British Pound" },
+  { code: "JPY", label: "Japanese Yen" },
+  { code: "CAD", label: "Canadian Dollar" },
+  { code: "AUD", label: "Australian Dollar" },
+  { code: "CHF", label: "Swiss Franc" },
+  { code: "CNY", label: "Chinese Yuan" },
+  { code: "INR", label: "Indian Rupee" },
+  { code: "UAH", label: "Ukrainian Hryvnia" },
 ];
 
-/**
- * Get currency by code
- */
-export function getCurrencyByCode(code: string): Currency | undefined {
-  return CURRENCIES.find((currency) => currency.code === code);
+export function isCurrencyCode(value: string): value is CurrencyCode {
+  return SUPPORTED_CURRENCIES.includes(value as CurrencyCode);
 }
 
-/**
- * Format amount with proper decimal places
- */
-export function formatAmount(amount: number, decimals: number = 2): string {
-  return amount.toFixed(decimals);
+export function sanitizeAmountInput(value: string): string {
+  return value.replace(/[^\d.]/g, "");
 }
 
-/**
- * Convert amount from one currency to another
- */
-export function convertCurrency(
-  amount: number,
-  fromRate: number,
-  toRate: number
-): number {
-  // Convert to base currency first, then to target currency
-  const baseAmount = amount / fromRate;
-  return baseAmount * toRate;
+export function parseAmount(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
-/**
- * Format currency display
- */
-export function formatCurrencyDisplay(
-  amount: number,
-  currencyCode: string
-): string {
-  const currency = getCurrencyByCode(currencyCode);
-  const formattedAmount = formatAmount(amount);
-  
-  if (currency) {
-    return `${currency.symbol}${formattedAmount}`;
+export function validateAmount(value: string): string | null {
+  if (!value.trim()) {
+    return "Amount is required";
   }
-  
-  return `${currencyCode} ${formattedAmount}`;
+
+  const amount = parseAmount(value);
+  if (!Number.isFinite(amount)) {
+    return "Amount must be a number";
+  }
+
+  if (amount <= 0) {
+    return "Amount must be greater than 0";
+  }
+
+  return null;
 }
 
-/**
- * Validate amount input
- */
-export function validateAmount(value: string): {
-  isValid: boolean;
-  error?: string;
-} {
-  if (!value || value.trim() === '') {
-    return { isValid: false, error: 'Please enter an amount' };
-  }
+export function roundTo(value: number, decimals = 4): number {
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
 
-  const numValue = parseFloat(value);
-  
-  if (isNaN(numValue)) {
-    return { isValid: false, error: 'Please enter a valid number' };
-  }
+export function convertAmount(amount: number, rate: number): number {
+  return roundTo(amount * rate, 4);
+}
 
-  if (numValue <= 0) {
-    return { isValid: false, error: 'Amount must be greater than zero' };
-  }
-
-  if (numValue > 1000000000) {
-    return { isValid: false, error: 'Amount is too large' };
-  }
-
-  return { isValid: true };
+export function formatCurrency(amount: number, currency: CurrencyCode): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "JPY" ? 0 : 2,
+  }).format(amount);
 }

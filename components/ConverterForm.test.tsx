@@ -1,153 +1,151 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import ConverterForm from './ConverterForm';
-import { ExchangeRates } from '@/types';
+import { fireEvent, render, screen } from "@testing-library/react";
+import { ConverterForm } from "./ConverterForm";
 
-const mockExchangeRates: ExchangeRates = {
-  base: 'USD',
-  rates: {
-    USD: 1,
-    EUR: 0.85,
-    GBP: 0.73,
-    JPY: 110,
-  },
-  timestamp: Date.now(),
+const replace = jest.fn();
+const searchParams = new URLSearchParams();
+const conversion = {
+  error: null,
+  data: { amount: 1, convertedAmount: 0.9, rate: 0.9 },
+};
+const emptyHistory: never[] = [];
+const addToHistoryMock = jest.fn(() => emptyHistory);
+const clearHistoryMock = jest.fn();
+const loadHistoryMock = jest.fn(() => emptyHistory);
+const setAmountMock = jest.fn();
+const setFromCurrencyMock = jest.fn();
+const setToCurrencyMock = jest.fn();
+const swapCurrenciesMock = jest.fn();
+
+let converterMockState = {
+  amount: "1",
+  setAmount: setAmountMock,
+  fromCurrency: "USD",
+  setFromCurrency: setFromCurrencyMock,
+  toCurrency: "EUR",
+  setToCurrency: setToCurrencyMock,
+  swapCurrencies: swapCurrenciesMock,
+  getConversion: () => conversion,
+  amountError: null as string | null,
 };
 
-describe('ConverterForm', () => {
-  const defaultProps = {
-    amount: '100',
-    fromCurrency: 'USD',
-    toCurrency: 'EUR',
-    result: 85,
-    validationError: null,
-    exchangeRates: mockExchangeRates,
-    onAmountChange: jest.fn(),
-    onFromCurrencyChange: jest.fn(),
-    onToCurrencyChange: jest.fn(),
-    onSwap: jest.fn(),
-  };
+let exchangeRatesMockState = {
+  data: { base: "USD", source: "mock", timestamp: new Date().toISOString(), rates: {} },
+  isLoading: false,
+  error: null as string | null,
+};
 
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+  useSearchParams: () => searchParams,
+}));
+
+jest.mock("@/hooks", () => ({
+  useConverter: () => converterMockState,
+  useExchangeRates: () => exchangeRatesMockState,
+}));
+
+jest.mock("@/utils/storage", () => ({
+  addToHistory: () => addToHistoryMock(),
+  clearHistory: () => clearHistoryMock(),
+  loadHistory: () => loadHistoryMock(),
+}));
+
+describe("ConverterForm", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    addToHistoryMock.mockClear();
+    clearHistoryMock.mockClear();
+    loadHistoryMock.mockClear();
+
+    converterMockState = {
+      amount: "1",
+      setAmount: setAmountMock,
+      fromCurrency: "USD",
+      setFromCurrency: setFromCurrencyMock,
+      toCurrency: "EUR",
+      setToCurrency: setToCurrencyMock,
+      swapCurrencies: swapCurrenciesMock,
+      getConversion: () => conversion,
+      amountError: null,
+    };
+
+    exchangeRatesMockState = {
+      data: { base: "USD", source: "mock", timestamp: new Date().toISOString(), rates: {} },
+      isLoading: false,
+      error: null,
+    };
   });
 
-  it('should render all form elements', () => {
-    render(<ConverterForm {...defaultProps} />);
-    
-    expect(screen.getByPlaceholderText('Enter amount')).toBeInTheDocument();
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /swap currencies/i })).toBeInTheDocument();
+  it("renders controls", () => {
+    render(<ConverterForm />);
+
+    expect(screen.getByLabelText(/amount/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /swap currencies/i })).toBeInTheDocument();
+    expect(screen.getByText(/conversion result/i)).toBeInTheDocument();
   });
 
-  it('should display conversion result when no validation error', () => {
-    render(<ConverterForm {...defaultProps} />);
-    
-    expect(screen.getByText('Converted Amount')).toBeInTheDocument();
-    expect(screen.getByText(/€85.00/)).toBeInTheDocument();
+  it("adds to history only once for unchanged conversion", () => {
+    const { rerender } = render(<ConverterForm />);
+
+    expect(addToHistoryMock).toHaveBeenCalledTimes(1);
+
+    rerender(<ConverterForm />);
+
+    expect(addToHistoryMock).toHaveBeenCalledTimes(1);
   });
 
-  it('should not display result when validation error exists', () => {
-    render(
-      <ConverterForm
-        {...defaultProps}
-        validationError="Please enter a valid amount"
-      />
-    );
-    
-    expect(screen.queryByText('Converted Amount')).not.toBeInTheDocument();
+  it("clears history when clear button is clicked", () => {
+    render(<ConverterForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: /clear/i }));
+
+    expect(clearHistoryMock).toHaveBeenCalledTimes(1);
   });
 
-  it('should call onAmountChange when amount input changes', async () => {
-    const user = userEvent.setup();
-    
-    render(<ConverterForm {...defaultProps} />);
-    
-    const input = screen.getByPlaceholderText('Enter amount');
-    await user.clear(input);
-    await user.type(input, '200');
-    
-    expect(defaultProps.onAmountChange).toHaveBeenCalled();
+  it("does not save history when from and to currencies are the same", () => {
+    converterMockState = {
+      amount: "90",
+      setAmount: setAmountMock,
+      fromCurrency: "EUR",
+      setFromCurrency: setFromCurrencyMock,
+      toCurrency: "EUR",
+      setToCurrency: setToCurrencyMock,
+      swapCurrencies: swapCurrenciesMock,
+      getConversion: () => ({
+        error: null,
+        data: { amount: 90, convertedAmount: 90, rate: 1 },
+      }),
+      amountError: null,
+    };
+
+    render(<ConverterForm />);
+
+    expect(addToHistoryMock).not.toHaveBeenCalled();
   });
 
-  it('should call onFromCurrencyChange when from currency changes', async () => {
-    const user = userEvent.setup();
-    
-    render(<ConverterForm {...defaultProps} />);
-    
-    const selects = screen.getAllByRole('combobox');
-    await user.selectOptions(selects[0], 'GBP');
-    
-    expect(defaultProps.onFromCurrencyChange).toHaveBeenCalledWith('GBP');
-  });
+  it("does not save history while rates are for a different base currency", () => {
+    exchangeRatesMockState = {
+      data: { base: "USD", source: "mock", timestamp: new Date().toISOString(), rates: {} },
+      isLoading: false,
+      error: null,
+    };
 
-  it('should call onToCurrencyChange when to currency changes', async () => {
-    const user = userEvent.setup();
-    
-    render(<ConverterForm {...defaultProps} />);
-    
-    const selects = screen.getAllByRole('combobox');
-    await user.selectOptions(selects[1], 'JPY');
-    
-    expect(defaultProps.onToCurrencyChange).toHaveBeenCalledWith('JPY');
-  });
+    converterMockState = {
+      amount: "90",
+      setAmount: setAmountMock,
+      fromCurrency: "EUR",
+      setFromCurrency: setFromCurrencyMock,
+      toCurrency: "USD",
+      setToCurrency: setToCurrencyMock,
+      swapCurrencies: swapCurrenciesMock,
+      getConversion: () => ({
+        error: null,
+        data: { amount: 90, convertedAmount: 97.83, rate: 1.087 },
+      }),
+      amountError: null,
+    };
 
-  it('should call onSwap when swap button is clicked', async () => {
-    const user = userEvent.setup();
-    
-    render(<ConverterForm {...defaultProps} />);
-    
-    const swapButton = screen.getByRole('button', { name: /swap currencies/i });
-    await user.click(swapButton);
-    
-    expect(defaultProps.onSwap).toHaveBeenCalledTimes(1);
-  });
+    render(<ConverterForm />);
 
-  it('should calculate and display exchange rate correctly', () => {
-    render(<ConverterForm {...defaultProps} />);
-    
-    // Rate should be EUR/USD = 0.85/1 = 0.85
-    expect(screen.getByText(/1 USD = 0.8500 EUR/)).toBeInTheDocument();
-  });
-
-  it('should handle cross-currency rate calculation', () => {
-    render(
-      <ConverterForm
-        {...defaultProps}
-        fromCurrency="GBP"
-        toCurrency="JPY"
-        result={150.68}
-      />
-    );
-    
-    // Rate should be JPY/GBP = 110/0.73 ≈ 150.6849
-    expect(screen.getByText(/1 GBP = 150.6849 JPY/)).toBeInTheDocument();
-  });
-
-  it('should display validation error below the input row', () => {
-    const errorMessage = 'Amount must be greater than zero';
-    
-    render(
-      <ConverterForm {...defaultProps} validationError={errorMessage} />
-    );
-    
-    expect(screen.getByText(errorMessage)).toBeInTheDocument();
-    // Error should be displayed as a separate element below the row
-    const errorElement = screen.getByText(errorMessage);
-    expect(errorElement).toHaveClass('text-red-600');
-  });
-
-  it('should render without exchange rates', () => {
-    render(<ConverterForm {...defaultProps} exchangeRates={null} />);
-    
-    expect(screen.getByPlaceholderText('Enter amount')).toBeInTheDocument();
-    expect(screen.queryByText(/1 USD =/)).not.toBeInTheDocument();
-  });
-
-  it('should handle result of null gracefully', () => {
-    render(<ConverterForm {...defaultProps} result={null} />);
-    
-    expect(screen.getByPlaceholderText('Enter amount')).toBeInTheDocument();
-    expect(screen.queryByText('Converted Amount')).not.toBeInTheDocument();
+    expect(addToHistoryMock).not.toHaveBeenCalled();
   });
 });

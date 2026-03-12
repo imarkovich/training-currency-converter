@@ -1,16 +1,7 @@
-interface PageFooterProps {
-  lastUpdated?: number;
-}
-
-export default function PageFooter({ lastUpdated }: PageFooterProps) {
+export function PageFooter() {
   return (
-    <div className="text-center mt-8 text-gray-600 text-sm">
-      <p>Exchange rates are updated hourly</p>
-      {lastUpdated && (
-        <p className="mt-1">
-          Last updated: {new Date(lastUpdated).toLocaleString()}
-        </p>
-      )}
-    </div>
+    <footer className="mt-auto pt-8 text-center text-xs text-muted sm:text-sm">
+      <p>Data is fetched server-side with provider fallbacks and one-hour caching.</p>
+    </footer>
   );
 }

@@ -1,68 +1,52 @@
-import { ConversionHistory, ConversionResult } from '@/types';
+import type { ConversionRecord } from "@/types";
 
-const STORAGE_KEY = 'currency_converter_history';
-const MAX_HISTORY_ITEMS = 10;
+const HISTORY_KEY = "currency-converter-history";
+export const HISTORY_LIMIT = 10;
 
-/**
- * Get conversion history from localStorage
- */
-export function getConversionHistory(): ConversionResult[] {
-  if (typeof window === 'undefined') {
+function canUseStorage(): boolean {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+export function loadHistory(): ConversionRecord[] {
+  if (!canUseStorage()) {
     return [];
   }
 
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
+    const raw = window.localStorage.getItem(HISTORY_KEY);
+    if (!raw) {
       return [];
     }
 
-    const history: ConversionHistory = JSON.parse(stored);
-    return history.conversions || [];
-  } catch (error) {
-    console.error('Error reading conversion history:', error);
+    const parsed = JSON.parse(raw) as ConversionRecord[];
+    return Array.isArray(parsed) ? parsed.slice(0, HISTORY_LIMIT) : [];
+  } catch {
     return [];
   }
 }
 
-/**
- * Save conversion to history
- */
-export function saveConversion(conversion: ConversionResult): void {
-  if (typeof window === 'undefined') {
+export function saveHistory(history: ConversionRecord[]): void {
+  if (!canUseStorage()) {
     return;
   }
 
   try {
-    const history = getConversionHistory();
-    
-    // Add new conversion at the beginning
-    const updatedHistory = [conversion, ...history];
-    
-    // Keep only the last MAX_HISTORY_ITEMS items
-    const trimmedHistory = updatedHistory.slice(0, MAX_HISTORY_ITEMS);
-    
-    const historyData: ConversionHistory = {
-      conversions: trimmedHistory,
-    };
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(historyData));
-  } catch (error) {
-    console.error('Error saving conversion history:', error);
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, HISTORY_LIMIT)));
+  } catch {
+    // Ignore storage write errors such as quota limits.
   }
 }
 
-/**
- * Clear all conversion history
- */
-export function clearConversionHistory(): void {
-  if (typeof window === 'undefined') {
+export function addToHistory(record: ConversionRecord): ConversionRecord[] {
+  const next = [record, ...loadHistory()].slice(0, HISTORY_LIMIT);
+  saveHistory(next);
+  return next;
+}
+
+export function clearHistory(): void {
+  if (!canUseStorage()) {
     return;
   }
 
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('Error clearing conversion history:', error);
-  }
+  window.localStorage.removeItem(HISTORY_KEY);
 }

@@ -1,46 +1,55 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ExchangeRates } from '@/types';
+"use client";
 
-export function useExchangeRates() {
-  const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+import { useEffect, useState } from "react";
+import type { CurrencyCode, ExchangeRatesPayload } from "@/types";
+
+interface UseExchangeRatesState {
+  data: ExchangeRatesPayload | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+export function useExchangeRates(baseCurrency: CurrencyCode) {
+  const [state, setState] = useState<UseExchangeRatesState>({
+    data: null,
+    isLoading: true,
+    error: null,
+  });
 
   useEffect(() => {
-    let isMounted = true;
+    let isCancelled = false;
 
-    const fetchRates = async () => {
-      setLoading(true);
-      setError(null);
+    async function fetchRates() {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
-        const response = await fetch('/api/rates');
-        const data = await response.json();
-
-        if (!isMounted) return;
-
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch exchange rates');
+        const response = await fetch(`/api/rates?base=${baseCurrency}`);
+        if (!response.ok) {
+          const payload = (await response.json()) as { error?: string };
+          throw new Error(payload.error ?? "Failed to fetch exchange rates");
         }
 
-        setExchangeRates(data.data);
-      } catch (err: any) {
-        if (!isMounted) return;
-        setError(err.message || 'Failed to fetch exchange rates. Please try again later.');
-        console.error('Error fetching rates:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
+        const payload = (await response.json()) as ExchangeRatesPayload;
+        if (!isCancelled) {
+          setState({ data: payload, isLoading: false, error: null });
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setState({
+            data: null,
+            isLoading: false,
+            error: error instanceof Error ? error.message : "Unexpected error",
+          });
         }
       }
-    };
+    }
 
     fetchRates();
 
     return () => {
-      isMounted = false;
+      isCancelled = true;
     };
-  }, []);
+  }, [baseCurrency]);
 
-  return { exchangeRates, loading, error };
+  return state;
 }

@@ -1,35 +1,28 @@
-import { CURRENCIES } from '@/utils/currency';
+import type { CurrencyCode } from "@/types";
+import { CURRENCY_OPTIONS } from "@/utils/currency";
 
 interface CurrencySelectProps {
-  value: string;
-  onChange: (value: string) => void;
-  label?: string;
+  label: string;
+  value: CurrencyCode;
+  onChange: (value: CurrencyCode) => void;
 }
 
-export default function CurrencySelect({ value, onChange, label }: CurrencySelectProps) {
+export function CurrencySelect({ label, value, onChange }: CurrencySelectProps) {
   return (
-    <div className="flex-1 w-full sm:w-auto relative">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {label}
-        </label>
-      )}
+    <label className="flex min-w-36 flex-1 flex-col gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <select
+        aria-label={label}
+        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none text-lg bg-white cursor-pointer hover:border-gray-400 transition-colors appearance-none"
+        onChange={(event) => onChange(event.target.value as CurrencyCode)}
       >
-        {CURRENCIES.map((currency) => (
-          <option key={currency.code} value={currency.code}>
-            {currency.code} - {currency.name}
+        {CURRENCY_OPTIONS.map((option) => (
+          <option key={option.code} value={option.code}>
+            {option.code} - {option.label}
           </option>
         ))}
       </select>
-      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-    </div>
+    </label>
   );
 }

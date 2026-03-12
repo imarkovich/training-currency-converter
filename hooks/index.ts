@@ -1,2 +1,2 @@
-export { useConverter } from './useConverter';
-export { useExchangeRates } from './useExchangeRates';
+export * from "./useConverter";
+export * from "./useExchangeRates";

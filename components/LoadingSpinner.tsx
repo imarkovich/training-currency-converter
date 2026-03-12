@@ -1,12 +1,9 @@
-interface LoadingSpinnerProps {
-  message?: string;
-}
-
-export default function LoadingSpinner({ message = 'Loading...' }: LoadingSpinnerProps) {
+export function LoadingSpinner() {
   return (
-    <div className="text-center text-gray-600 py-4">
-      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      <p className="mt-2">{message}</p>
-    </div>
+    <span
+      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary/20 border-t-primary"
+      role="status"
+      aria-label="Loading"
+    />
   );
 }
