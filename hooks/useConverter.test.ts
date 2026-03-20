@@ -271,4 +271,37 @@ describe('useConverter', () => {
       expect(result.current.result).toBe(null);
     });
   });
+
+  it('should recalculate result when exchange rates are refreshed', async () => {
+    const updatedRates: ExchangeRates = {
+      ...mockExchangeRates,
+      rates: {
+        ...mockExchangeRates.rates,
+        EUR: 0.9,
+      },
+    };
+
+    const { result, rerender } = renderHook(
+      ({ rates }) => useConverter(rates),
+      {
+        initialProps: {
+          rates: mockExchangeRates as ExchangeRates | null,
+        },
+      }
+    );
+
+    act(() => {
+      result.current.setAmount('100');
+    });
+
+    await waitFor(() => {
+      expect(result.current.result).toBe(85);
+    });
+
+    rerender({ rates: updatedRates });
+
+    await waitFor(() => {
+      expect(result.current.result).toBe(90);
+    });
+  });
 });

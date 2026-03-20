@@ -10,6 +10,10 @@ describe('useExchangeRates', () => {
     (global.fetch as jest.Mock).mockClear();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('should fetch exchange rates on mount', async () => {
     const mockRates = {
       base: 'USD',
@@ -33,7 +37,10 @@ describe('useExchangeRates', () => {
 
     expect(result.current.exchangeRates).toEqual(mockRates);
     expect(result.current.error).toBe(null);
-    expect(global.fetch).toHaveBeenCalledWith('/api/rates');
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/api\/rates\?ts=\d+$/),
+      { cache: 'no-store' }
+    );
   });
 
   it('should handle fetch errors', async () => {
@@ -120,7 +127,105 @@ describe('useExchangeRates', () => {
     renderHook(() => useExchangeRates());
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/rates');
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/api\/rates\?ts=\d+$/),
+        { cache: 'no-store' }
+      );
+    });
+  });
+
+  it('should refresh rates manually and show success alert', async () => {
+    const mockRates = {
+      base: 'USD',
+      rates: { USD: 1, EUR: 0.9 },
+      timestamp: Date.now(),
+    };
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        json: async () => ({ success: true, data: mockRates }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ success: true, data: mockRates }),
+      });
+
+    const { result } = renderHook(() => useExchangeRates());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await result.current.refreshRates();
+
+    expect(result.current.notification).toEqual(
+      expect.objectContaining({
+        type: 'success',
+        message: 'Rates updated',
+      })
+    );
+    expect(result.current.refreshing).toBe(false);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+
+    result.current.clearNotification();
+    expect(result.current.notification).toBe(null);
+  });
+
+  it('should set error notification when manual refresh fails', async () => {
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        json: async () => ({ success: true, data: { base: 'USD', rates: { USD: 1 } } }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ success: false, error: 'Refresh failed' }),
+      });
+
+    const { result } = renderHook(() => useExchangeRates());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await result.current.refreshRates();
+
+    expect(result.current.notification).toEqual(
+      expect.objectContaining({
+        type: 'error',
+        message: 'Refresh failed',
+      })
+    );
+    await waitFor(() => {
+      expect(result.current.error).toBe('Refresh failed');
+    });
+  });
+
+  it('should auto-refresh every 60 seconds', async () => {
+    jest.useFakeTimers();
+
+    const mockRates = {
+      base: 'USD',
+      rates: { USD: 1, EUR: 0.85 },
+      timestamp: Date.now(),
+    };
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        json: async () => ({ success: true, data: mockRates }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ success: true, data: mockRates }),
+      });
+
+    renderHook(() => useExchangeRates());
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    jest.advanceTimersByTime(60000);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
   });
 });
