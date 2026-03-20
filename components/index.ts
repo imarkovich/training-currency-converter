@@ -5,6 +5,7 @@ export { default as ConverterForm } from './ConverterForm';
 export { default as CurrencySelect } from './CurrencySelect';
 export { default as ErrorMessage } from './ErrorMessage';
 export { default as LoadingSpinner } from './LoadingSpinner';
+export { default as Notification } from './Notification';
 export { default as PageFooter } from './PageFooter';
 export { default as PageHeader } from './PageHeader';
 export { default as SwapButton } from './SwapButton';

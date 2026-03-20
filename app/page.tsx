@@ -7,6 +7,7 @@ import ErrorMessage from '@/components/ErrorMessage';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ConverterForm from '@/components/ConverterForm';
 import ConversionHistory from '@/components/ConversionHistory';
+import Notification from '@/components/Notification';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useConverter } from '@/hooks/useConverter';
 
@@ -14,7 +15,15 @@ export default function Home() {
   const [showHistory, setShowHistory] = useState<boolean>(false);
   
   // Fetch exchange rates
-  const { exchangeRates, loading, error } = useExchangeRates();
+  const {
+    exchangeRates,
+    loading,
+    refreshing,
+    error,
+    refreshRates,
+    notification,
+    clearNotification,
+  } = useExchangeRates();
 
   // Conversion logic
   const {
@@ -34,10 +43,13 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
+      <Notification notification={notification} onClose={clearNotification} />
       <div className="max-w-4xl mx-auto">
         <PageHeader
           title="Currency Converter"
           subtitle="Convert currencies with real-time exchange rates"
+          onRefreshRates={refreshRates}
+          refreshing={refreshing}
         />
 
         {/* Main Converter Card */}
